@@ -74,34 +74,22 @@ async function handleRequest(req, env, deployPlatform, clientIp, ctx) {
   }
 
   // --- 校验 token ---
-  // 🔧 强制通过验证：直接赋值 currentToken，跳过所有校验
-  if (path !== "/favicon.ico" && path !== "/robots.txt") {
-    globals.currentToken = "87654321";
-  }
-
-  // 🔧 注释掉原有的 Token 校验逻辑（已屏蔽）
-  /*
-  const parts = path.split("/").filter(Boolean); // 去掉空段
-  const knownApiPaths = ["api", "v1", "v2", "search", "match", "bangumi", "comment", "danmaku"];
+  // 获取路径的第一段作为 token
+  const parts = path.split("/").filter(Boolean);
   const firstPart = parts[0] || "";
-  const isDefaultToken = globals.token === "87654321";
-  const isValidToken = firstPart === globals.token || firstPart === globals.adminToken;
-  globals.currentToken = 
-    isValidToken ? firstPart :
-    isDefaultToken && (firstPart === "87654321" || knownApiPaths.includes(firstPart)) ? 
-      (firstPart === "87654321" ? firstPart : "87654321") :
-    "";
-  */
 
-  if (deployPlatform === "node" && globals.localCacheValid && path !== "/favicon.ico" && path !== "/robots.txt") {
-    await getLocalCaches();
+  // 如果第一段不是 api/v1/v2，就当作 token 处理并移除
+  if (firstPart && firstPart !== "api" && firstPart !== "v1" && firstPart !== "v2") {
+    globals.currentToken = firstPart;
+    path = "/" + parts.slice(1).join("/");
+  } else {
+    // 没有 token 或第一段是 api/v1/v2，使用默认值
+    globals.currentToken = globals.token || "87654321";
   }
-  if (globals.redisValid && path !== "/favicon.ico" && path !== "/robots.txt") {
-    await getRedisCaches();
-  }
-  if (deployPlatform === "node" && globals.localRedisValid && path !== "/favicon.ico" && path !== "/robots.txt") {
-    const { getLocalRedisCaches } = await import("./utils/local-redis-util.js");
-    await getLocalRedisCaches();
+
+  // 确保 globals.token 有值，供前端页面读取
+  if (!globals.token) {
+    globals.token = "87654321";
   }
 
   // 检查路径是否包含指定的接口关键字
